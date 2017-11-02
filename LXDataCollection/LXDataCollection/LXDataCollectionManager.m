@@ -32,6 +32,8 @@
 
 @implementation LXDataCollectionManager
 
+#pragma mark - 单例方法
+
 static LXDataCollectionManager *instance = nil;
 
 + (instancetype)shareManager {
@@ -53,6 +55,8 @@ static LXDataCollectionManager *instance = nil;
     return instance;
 }
 
+#pragma mark - 添加事件
+
 + (void)addEvent:(NSString *)eventName {
     [self addEvent:eventName attributes:nil];
 }
@@ -69,6 +73,8 @@ static LXDataCollectionManager *instance = nil;
     NSString *actionStr = [LXJSONHelper objectToJSON:model pretty:YES];
     [self addAction:actionStr];
 }
+
+#pragma mark - save & upload
 
 + (void)save {
     LXDataCollectionManager *manager = [LXDataCollectionManager shareManager];
@@ -88,11 +94,20 @@ static LXDataCollectionManager *instance = nil;
     for (NSString *fileName in files) {
         //是否是备份文件
         if ([fileName isEqualToString:@"backup"]) continue;
-        //
+        
+        //上传(上传失败的话最多重新上传3次)
+        [self uploadFile:fileName recursionCount:3];
     }
 }
 
 #pragma mark - private method
+
++ (BOOL)removeFile:(NSString *)filePath {
+    NSString *fileItem = [self obtainDataArchivePath:filePath];
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    
+    return [fileManager removeItemAtPath:fileItem error:nil];
+}
 
 + (void)uploadFile:(NSString *)fileName recursionCount:(NSInteger)recursionCount {
     if (recursionCount <= 0 || recursionCount > 3) {
@@ -113,6 +128,7 @@ static LXDataCollectionManager *instance = nil;
     __block NSInteger iCount = recursionCount;
     [helper upload:params completion:^(id responseObject) {
         //上传完成功删除文件
+        [self removeFile:fileName];
     } failure:^(NSError *error) {
         //再次上传
         iCount -= 1;
