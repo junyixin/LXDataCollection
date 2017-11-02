@@ -9,6 +9,7 @@
 #import "LXDataCollectionManager.h"
 #import "LXCommonDataModel.h"
 #import "LXJSONHelper.h"
+#import "LXDataUploadHelper.h"
 
 @import UIKit;
 
@@ -78,10 +79,64 @@ static LXDataCollectionManager *instance = nil;
 }
 
 + (void)upload {
-    //
+    [self save];
+    
+    //获取所有需要上传的数据
+    NSString *rootPath = [self obtainDataArchiveDir];
+    NSArray *files = [self obtainAllFileByPath:rootPath];
+    
+    for (NSString *fileName in files) {
+        //是否是备份文件
+        if ([fileName isEqualToString:@"backup"]) continue;
+        //
+    }
 }
 
 #pragma mark - private method
+
++ (void)uploadFile:(NSString *)fileName recursionCount:(NSInteger)recursionCount {
+    if (recursionCount <= 0 || recursionCount > 3) {
+        return;
+    }
+    
+    //获取所有的事件记录
+    NSMutableArray *uploadRecords = [self unArchiveRecords:fileName];
+    if (uploadRecords.count <= 0) return;
+    
+    LXDataUploadHelper *helper = [LXDataUploadHelper shareHelper];
+    NSString *uploadTime = [NSString stringWithFormat:@"%0.f", [[NSDate date] timeIntervalSince1970] * 1000];
+    
+    NSDictionary *params = @{
+                             @"uploadTime":uploadTime,
+                             @"records":uploadRecords
+                             };
+    __block NSInteger iCount = recursionCount;
+    [helper upload:params completion:^(id responseObject) {
+        //上传完成功删除文件
+    } failure:^(NSError *error) {
+        //再次上传
+        iCount -= 1;
+        [self uploadFile:fileName recursionCount:iCount];
+    }];
+}
+
++ (NSArray *)obtainAllFileByPath:(NSString *)path {
+    NSMutableArray *array = [NSMutableArray array];
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    NSArray *tempArr = [fileManager contentsOfDirectoryAtPath:path error:nil];
+    
+    for (NSString *fileName in tempArr) {
+        BOOL flag = YES;
+        NSString *fullPath = [path stringByAppendingPathComponent:fileName];
+        if ([fileManager fileExistsAtPath:fullPath isDirectory:&flag]) {
+            if (!flag) {
+                [array addObject:fileName];
+            }
+        }
+    }
+    
+    return array;
+}
 
 + (NSString *)obtainFileName {
     NSDate *sendDate = [NSDate date];
